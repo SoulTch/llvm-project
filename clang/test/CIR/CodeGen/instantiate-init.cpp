@@ -92,16 +92,13 @@ void init_vec_using_initalizer_list() {
 // LLVM: [[DONE]]:
 // LLVM:   ret void
 
+// The classic CodeGen path gives the backing array static storage duration
+// (P2752R3), so there is no stack array and no element-wise stores.
+// OGCG: @[[BACKING:.*]] = private constant [3 x i32] [i32 0, i32 1, i32 2], align 4
 // OGCG: %[[VEC_ADDR:.*]] = alloca %struct.Vector, align 1
 // OGCG: %[[AGG_ADDR:.*]] = alloca %"class.std::initializer_list", align 8
-// OGCG: %[[INIT_LIST_ADDR:.*]] = alloca [3 x i32], align 4
-// OGCG: store i32 0, ptr %[[INIT_LIST_ADDR]], align 4
-// OGCG: %[[ELEM_1_PTR:.*]] = getelementptr inbounds i32, ptr %[[INIT_LIST_ADDR]], i64 1
-// OGCG: store i32 1, ptr %[[ELEM_1_PTR]], align 4
-// OGCG: %[[ELEM_2_PTR:.*]] = getelementptr inbounds i32, ptr %[[INIT_LIST_ADDR]], i64 2
-// OGCG: store i32 2, ptr %[[ELEM_2_PTR]], align 4
 // OGCG: %[[DATA_PTR:.*]] = getelementptr inbounds nuw %"class.std::initializer_list", ptr %[[AGG_ADDR]], i32 0, i32 0
-// OGCG: store ptr %ref.tmp, ptr %[[DATA_PTR]], align 8
+// OGCG: store ptr @[[BACKING]], ptr %[[DATA_PTR]], align 8
 // OGCG: %[[SIZE_PTR:.*]] = getelementptr inbounds nuw %"class.std::initializer_list", ptr %[[AGG_ADDR]], i32 0, i32 1
 // OGCG: store i64 3, ptr %[[SIZE_PTR]], align 8
 // OGCG: %[[DATA_PTR:.*]] = getelementptr inbounds nuw { ptr, i64 }, ptr %[[AGG_ADDR]], i32 0, i32 0

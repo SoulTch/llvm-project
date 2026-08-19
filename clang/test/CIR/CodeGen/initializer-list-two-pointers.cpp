@@ -53,15 +53,11 @@ void initalizer_list_with_two_pointers_layout() {
 // LLVM: store ptr %[[ARR_END]], ptr %[[END_PTR]], align 8
 // LLVM: ret void
 
+// The classic CodeGen path gives the backing array static storage duration
+// (P2752R3), so there is no stack array and no element-wise stores.
+// OGCG: @[[BACKING:.*]] = private constant [3 x i32] [i32 10, i32 20, i32 30], align 4
 // OGCG: %[[A_ADDR:.*]] = alloca %"class.std::initializer_list", align 8
-// OGCG: %[[ARR_ADDR:.*]] = alloca [3 x i32], align 4
-// OGCG: store i32 10, ptr %[[ARR_ADDR]], align 4
-// OGCG: %[[ARR_ELEM_1_PTR:.*]] = getelementptr inbounds i32, ptr %[[ARR_ADDR]], i64 1
-// OGCG: store i32 20, ptr %[[ARR_ELEM_1_PTR]], align 4
-// OGCG: %[[ARR_ELEM_2_PTR:.*]] = getelementptr inbounds i32, ptr %[[ARR_ADDR]], i64 2
-// OGCG: store i32 30, ptr %[[ARR_ELEM_2_PTR]], align 4
 // OGCG: %[[BEGIN_PTR:.*]] = getelementptr inbounds nuw %"class.std::initializer_list", ptr %[[A_ADDR]], i32 0, i32 0
-// OGCG: store ptr %[[ARR_ADDR]], ptr %[[BEGIN_PTR]], align 8
+// OGCG: store ptr @[[BACKING]], ptr %[[BEGIN_PTR]], align 8
 // OGCG: %[[END_PTR:.*]] = getelementptr inbounds nuw %"class.std::initializer_list", ptr %[[A_ADDR]], i32 0, i32 1
-// OGCG: %[[ARR_END:.*]] = getelementptr inbounds [3 x i32], ptr %[[ARR_ADDR]], i64 0, i64 3
-// OGCG: store ptr %[[ARR_END]], ptr %[[END_PTR]], align 8
+// OGCG: store ptr getelementptr inbounds nuw (i8, ptr @[[BACKING]], i64 12), ptr %[[END_PTR]], align 8
