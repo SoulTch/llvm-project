@@ -431,18 +431,93 @@ void AggExprEmitter::EmitCopy(QualType type, const AggValueSlot &dest,
 
 /// Emit the initializer for a std::initializer_list initialized with a
 /// real initializer list.
+/// P2752R3: The backing array of a braced initializer list may be given static
+/// storage duration when it is constant-initialized, its element type is
+/// trivially destructible, and the element type has no mutable subobjects.
+/// Returns the address of the global holding the array, or an invalid Address
+/// if the optimization does not apply.
+static Address tryEmitStaticBackingArray(CodeGenFunction &CGF,
+                                         CXXStdInitializerListExpr *E,
+                                         const ConstantArrayType *ArrayType) {
+  ASTContext &Ctx = CGF.getContext();
+  QualType ElemType = ArrayType->getElementType();
+
+  // The elements must be trivially destructible; otherwise the backing array
+  // needs a cleanup tied to the enclosing scope.
+  if (ElemType.isDestructedType())
+    return Address::invalid();
+
+  // A mutable subobject would be observably shared between evaluations.
+  if (const auto *RD = ElemType->getAsCXXRecordDecl())
+    if (RD->hasDefinition() && RD->hasMutableFields())
+      return Address::invalid();
+
+  const Expr *Init = E->getSubExpr();
+  if (const auto *MTE = dyn_cast<MaterializeTemporaryExpr>(Init)) {
+    // A backing array whose lifetime is already extended to static or thread
+    // storage duration is emitted as a mangled global of its own, which other
+    // translation units may refer to. Leave those alone; this optimization is
+    // only useful for arrays that would otherwise land on the stack.
+    switch (MTE->getStorageDuration()) {
+    case SD_FullExpression:
+    case SD_Automatic:
+      break;
+    case SD_Static:
+    case SD_Thread:
+    case SD_Dynamic:
+      return Address::invalid();
+    }
+    Init = MTE->getSubExpr();
+  }
+
+  CodeGenModule &CGM = CGF.CGM;
+  QualType ArrayQTy = E->getSubExpr()->getType();
+  QualType GVArrayQTy =
+      Ctx.getAddrSpaceQualType(Ctx.removeAddrSpaceQualType(ArrayQTy),
+                               CGM.GetGlobalConstantAddressSpace());
+  LangAS AS = GVArrayQTy.getAddressSpace();
+
+  ConstantEmitter Emitter(CGF);
+  llvm::Constant *C = Emitter.tryEmitForInitializer(Init, AS, GVArrayQTy);
+  if (!C)
+    return Address::invalid();
+
+  auto *GV = new llvm::GlobalVariable(
+      CGM.getModule(), C->getType(), /*isConstant=*/true,
+      llvm::GlobalValue::PrivateLinkage, C, ".init_list_backing",
+      /*InsertBefore=*/nullptr, llvm::GlobalVariable::NotThreadLocal,
+      Ctx.getTargetAddressSpace(AS));
+  Emitter.finalize(GV);
+  CharUnits Align = Ctx.getTypeAlignInChars(GVArrayQTy);
+  GV->setAlignment(Align.getAsAlign());
+  GV->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::None);
+
+  llvm::Constant *Ptr = GV;
+  if (AS != ArrayQTy.getAddressSpace())
+    Ptr = CGM.performAddrSpaceCast(
+        GV, llvm::PointerType::get(
+                CGF.getLLVMContext(),
+                Ctx.getTargetAddressSpace(ArrayQTy.getAddressSpace())));
+
+  return Address(Ptr, GV->getValueType(), Align);
+}
+
 void AggExprEmitter::VisitCXXStdInitializerListExpr(
     CXXStdInitializerListExpr *E) {
   // Emit an array containing the elements.  The array is externally destructed
   // if the std::initializer_list object is.
   ASTContext &Ctx = CGF.getContext();
-  LValue Array = CGF.EmitLValue(E->getSubExpr());
-  assert(Array.isSimple() && "initializer_list array not a simple lvalue");
-  Address ArrayPtr = Array.getAddress();
 
   const ConstantArrayType *ArrayType =
       Ctx.getAsConstantArrayType(E->getSubExpr()->getType());
   assert(ArrayType && "std::initializer_list constructed from non-array");
+
+  Address ArrayPtr = tryEmitStaticBackingArray(CGF, E, ArrayType);
+  if (!ArrayPtr.isValid()) {
+    LValue Array = CGF.EmitLValue(E->getSubExpr());
+    assert(Array.isSimple() && "initializer_list array not a simple lvalue");
+    ArrayPtr = Array.getAddress();
+  }
 
   auto *Record = E->getType()->castAsRecordDecl();
   RecordDecl::field_iterator Field = Record->field_begin();

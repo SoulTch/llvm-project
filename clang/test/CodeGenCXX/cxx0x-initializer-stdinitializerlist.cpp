@@ -481,8 +481,8 @@ namespace B19773010 {
   void f1() {
     // CHECK-LABEL: @_ZN9B197730102f1Ev
     testcase a{{"", ENUM_CONSTANT}};
-    // X86: store ptr @.ref.tmp{{.*}}, ptr %{{.*}}, align 8
-    // AMDGCN: store ptr addrspacecast{{.*}} @.ref.tmp{{.*}}{{.*}}, ptr %{{.*}}, align 8
+    // X86: store ptr @.init_list_backing{{.*}}, ptr %{{.*}}, align 8
+    // AMDGCN: store ptr addrspacecast{{.*}} @.init_list_backing{{.*}}{{.*}}, ptr %{{.*}}, align 8
   }
   void f2() {
     // CHECK-LABEL: @_ZN9B197730102f2Ev
