@@ -256,3 +256,9 @@ namespace UnknownSizeArrayInEvaluateString {
   }
   }
 } // both-error {{extraneous closing brace}}
+
+namespace InvalidConstexpr {
+  constexpr void AlwaysThrows(bool b) { // both-error {{constexpr function never produces a constant expression}}
+    b ? throw 0 : throw 1;              // both-note {{both arms of conditional operator are unable to produce a constant expression}}
+  }
+}
