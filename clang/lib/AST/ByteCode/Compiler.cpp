@@ -2494,12 +2494,22 @@ bool Compiler<Emitter>::visitInitList(ArrayRef<const Expr *> Inits,
       }
     }
 
-    // Expand the filler expression.
-    // FIXME: This should go away.
     if (ArrayFiller && !isa<NoInitExpr>(ArrayFiller)) {
-      for (; ElementIndex != NumElems; ++ElementIndex) {
-        if (!this->visitArrayElemInit(ElementIndex, ArrayFiller, InitT))
+      // Value-initializing a primitive element has no side effects, so the
+      // filler can be evaluated once and copied into the remaining elements
+      // instead of being expanded into one initializer per element.
+      if (InitT && isa<ImplicitValueInitExpr>(ArrayFiller)) {
+        if (!this->visit(ArrayFiller))
           return false;
+        if (!this->emitFillArray(*InitT, ElementIndex, NumElems - ElementIndex,
+                                 E))
+          return false;
+        ElementIndex = NumElems;
+      } else {
+        for (; ElementIndex != NumElems; ++ElementIndex) {
+          if (!this->visitArrayElemInit(ElementIndex, ArrayFiller, InitT))
+            return false;
+        }
       }
     }
 

@@ -3622,6 +3622,30 @@ inline bool ArrayElemPop(InterpState &S, CodePtr OpPC, uint32_t Index) {
 }
 
 template <PrimType Name, class T = typename PrimConv<Name>::T>
+inline bool FillArray(InterpState &S, CodePtr OpPC, uint32_t StartIndex,
+                      uint32_t Count) {
+  const T &Value = S.Stk.pop<T>();
+  const Pointer &Ptr = S.Stk.peek<Pointer>();
+
+  if (Ptr.isDummy())
+    return false;
+  if (!Ptr.isBlockPointer())
+    return false;
+
+  const Descriptor *PtrDesc = Ptr.getFieldDesc();
+  if (!PtrDesc->isPrimitiveArray() || PtrDesc->getPrimType() != Name)
+    return false;
+  if (StartIndex + Count > PtrDesc->getNumElems())
+    return false;
+
+  for (uint32_t I = StartIndex, E = StartIndex + Count; I != E; ++I) {
+    Ptr.elem<T>(I) = Value;
+    Ptr.initializeElement(I);
+  }
+  return true;
+}
+
+template <PrimType Name, class T = typename PrimConv<Name>::T>
 inline bool CopyArray(InterpState &S, CodePtr OpPC, uint32_t SrcIndex,
                       uint32_t DestIndex, uint32_t Size) {
   const auto &SrcPtr = S.Stk.pop<Pointer>();

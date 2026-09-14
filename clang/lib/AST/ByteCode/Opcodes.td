@@ -436,6 +436,12 @@ def ArrayElem : Opcode {
   let HasGroup = 1;
 }
 
+def FillArray : Opcode {
+  let Args = [ArgUint32, ArgUint32];
+  let Types = [AllTypeClass];
+  let HasGroup = 1;
+}
+
 def CopyArray : Opcode {
   let Args = [ArgUint32, ArgUint32, ArgUint32];
   let Types = [AllTypeClass];
