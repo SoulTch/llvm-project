@@ -82,14 +82,31 @@ struct InitMapPtr final {
   /// V's value after the initmap has been destroyed because
   /// all its elements have already been initialized.
   static constexpr intptr_t AllInitializedValue = 1;
+  static constexpr uintptr_t UniformTag = 0b10;
+  static constexpr unsigned UniformShift = 2;
   uintptr_t V = NoInitMapValue;
 
   explicit InitMapPtr() = default;
   bool hasInitMap() const {
-    return V != NoInitMapValue && V != AllInitializedValue;
+    return V != NoInitMapValue && V != AllInitializedValue && !isUniform();
   }
   /// Are all elements in the array already initialized?
-  bool allInitialized() const { return V == AllInitializedValue; }
+  bool allInitialized() const {
+    return V == AllInitializedValue || isUniform();
+  }
+
+  bool isUniform() const { return (V & 0b11) == UniformTag; }
+  unsigned getUniformFrom() const {
+    assert(isUniform());
+    return V >> UniformShift;
+  }
+  void noteUniformFrom(unsigned Index) {
+    if (hasInitMap())
+      delete (operator->)();
+    V = (static_cast<uintptr_t>(Index) << UniformShift) | UniformTag;
+    assert(isUniform());
+    assert(getUniformFrom() == Index);
+  }
 
   void setInitMap(const InitMap *IM) {
     assert(IM != nullptr);
