@@ -3642,6 +3642,9 @@ inline bool FillArray(InterpState &S, CodePtr OpPC, uint32_t StartIndex,
     Ptr.elem<T>(I) = Value;
     Ptr.initializeElement(I);
   }
+
+  if (StartIndex + Count == PtrDesc->getNumElems())
+    Ptr.noteUniformFrom(StartIndex);
   return true;
 }
 

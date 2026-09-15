@@ -1195,6 +1195,11 @@ public:
   /// used in situations where we *know* we have initialized *all* elements
   /// of a primtive array.
   void initializeAllElements() const;
+  void noteUniformFrom(unsigned Index) const {
+    assert(getFieldDesc()->isPrimitiveArray());
+    assert(isArrayRoot());
+    getInitMap().noteUniformFrom(Index);
+  }
   /// Checks if an object was initialized.
   bool isInitialized() const;
   /// Like isInitialized(), but for primitive arrays.

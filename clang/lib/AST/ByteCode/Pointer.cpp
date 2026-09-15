@@ -1189,11 +1189,21 @@ static bool toRValue(const Context &Ctx, QualType Ty, PtrView Ptr, APValue &R) {
       return false;
     const size_t NumElems = Ptr.getNumElems();
     QualType ElemTy = AT->getElementType();
-    R = APValue(APValue::UninitArray{}, NumElems, NumElems);
+    OptPrimType ElemT = Ctx.classify(ElemTy);
+
+    size_t NumInit = NumElems;
+    if (ElemT && FieldDesc->isPrimitiveArray() && NumElems > 0 &&
+        Ptr.getInitMap().isUniform())
+      NumInit = std::min<size_t>(Ptr.getInitMap().getUniformFrom(), NumElems);
+
+    R = APValue(APValue::UninitArray{}, NumInit, NumElems);
+    if (R.hasArrayFiller()) {
+      TYPE_SWITCH(*ElemT, R.getArrayFiller() =
+                              Ptr.elem<T>(NumElems - 1).toAPValue(ASTCtx));
+    }
 
     bool Ok = true;
-    OptPrimType ElemT = Ctx.classify(ElemTy);
-    for (unsigned I = 0; I != NumElems; ++I) {
+    for (unsigned I = 0; I != NumInit; ++I) {
       APValue &Slot = R.getArrayInitializedElt(I);
       if (ElemT) {
         TYPE_SWITCH(*ElemT, Slot = Ptr.elem<T>(I).toAPValue(ASTCtx));
