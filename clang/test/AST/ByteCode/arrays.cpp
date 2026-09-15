@@ -855,3 +855,46 @@ namespace ErroneousArraySubscriptExpr {
     foo(val, 2) = 42;
   }
 }
+
+namespace ArrayFiller {
+  /// The filler is evaluated once and copied into the remaining elements.
+  constexpr int A[4] = {};
+  static_assert(A[0] == 0, "");
+  static_assert(A[3] == 0, "");
+
+  constexpr int B[4] = {1};
+  static_assert(B[0] == 1, "");
+  static_assert(B[1] == 0, "");
+  static_assert(B[3] == 0, "");
+
+  constexpr double D[3] = {1.5};
+  static_assert(D[0] == 1.5, "");
+  static_assert(D[2] == 0.0, "");
+
+  constexpr bool Z[3] = {true};
+  static_assert(Z[0], "");
+  static_assert(!Z[2], "");
+
+  constexpr const int *P[2] = {&B[0]};
+  static_assert(P[0] == &B[0], "");
+  static_assert(P[1] == nullptr, "");
+
+  /// Fillers of non-primitive type are initialized element by element.
+  struct S { int a; int b; };
+  constexpr S Aggregate[3] = {{1, 2}};
+  static_assert(Aggregate[0].a == 1 && Aggregate[0].b == 2, "");
+  static_assert(Aggregate[1].a == 0 && Aggregate[1].b == 0, "");
+  static_assert(Aggregate[2].a == 0 && Aggregate[2].b == 0, "");
+
+  struct C { int v; constexpr C() : v(7) {} };
+  constexpr C Ctors[3] = {};
+  static_assert(Ctors[0].v == 7, "");
+  static_assert(Ctors[2].v == 7, "");
+
+  /// The inner filler is primitive, the outer one is not.
+  constexpr int Nested[2][3] = {{1}};
+  static_assert(Nested[0][0] == 1, "");
+  static_assert(Nested[0][2] == 0, "");
+  static_assert(Nested[1][0] == 0, "");
+  static_assert(Nested[1][2] == 0, "");
+}
