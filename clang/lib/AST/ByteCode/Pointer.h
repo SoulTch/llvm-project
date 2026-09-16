@@ -252,7 +252,11 @@ struct PtrView {
     return *reinterpret_cast<T *>(Pointee->rawData() + Offset);
   }
 
-  template <typename T> T &elem(unsigned I) const {
+  template <typename T> const T &elem(unsigned I) const {
+    return elemRef<T>(I);
+  }
+
+  template <typename T> T &elemRef(unsigned I) const {
     assert(isLive() && "Invalid pointer");
     assert(Pointee);
     assert(getFieldDesc()->isPrimitiveArray());
@@ -1116,7 +1120,7 @@ public:
 
   /// Dereferences the element at index \p I.
   /// This is equivalent to atIndex(I).deref<T>().
-  template <typename T> T &elem(unsigned I) const {
+  template <typename T> const T &elem(unsigned I) const {
     assert(isLive() && "Invalid pointer");
     assert(isBlockPointer());
     assert(BS.Pointee);
@@ -1125,6 +1129,26 @@ public:
     assert(I < getFieldDesc()->getNumElems());
 
     return view().elem<T>(I);
+  }
+
+  template <typename T> T &elemRef(unsigned I) const {
+    assert(isLive() && "Invalid pointer");
+    assert(isBlockPointer());
+    assert(BS.Pointee);
+    assert(isDereferencable());
+    assert(getFieldDesc()->isPrimitiveArray());
+    assert(I < getFieldDesc()->getNumElems());
+
+    narrowUniformRange(I);
+    return view().elemRef<T>(I);
+  }
+
+  void narrowUniformRange(unsigned I) const {
+    if (!isArrayRoot())
+      return;
+    InitMapPtr &IM = getInitMap();
+    if (IM.isUniform() && I >= IM.getUniformFrom())
+      IM.noteUniformFrom(I + 1);
   }
 
   template <typename T> T loadElem(unsigned I) const {
@@ -1196,8 +1220,9 @@ public:
   /// of a primtive array.
   void initializeAllElements() const;
   void noteUniformFrom(unsigned Index) const {
+    if (!isBlockPointer() || !isArrayRoot())
+      return;
     assert(getFieldDesc()->isPrimitiveArray());
-    assert(isArrayRoot());
     getInitMap().noteUniformFrom(Index);
   }
   /// Checks if an object was initialized.

@@ -111,13 +111,13 @@ convertToBlockPointer(const Context &Ctx, const StringPointer &SP) {
 
   Pointer Ptr(B);
   if (CharWidth == 1) {
-    std::memcpy(&Ptr.elem<char>(0), S->getString().data(), StringLength);
+    std::memcpy(&Ptr.elemRef<char>(0), S->getString().data(), StringLength);
   } else {
     // Construct the string in storage.
     for (unsigned I = 0; I <= StringLength; ++I) {
       uint32_t CodePoint = I == StringLength ? 0 : S->getCodeUnit(I);
       INT_TYPE_SWITCH_NO_BOOL(*CharType,
-                              Ptr.elem<T>(I) = T::from(CodePoint, BitWidth););
+                              Ptr.elemRef<T>(I) = T::from(CodePoint, BitWidth););
     }
   }
   Ptr.initializeAllElements();
