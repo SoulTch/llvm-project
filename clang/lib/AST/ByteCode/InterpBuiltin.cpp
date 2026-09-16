@@ -1266,8 +1266,8 @@ static bool interp__builtin_complex(InterpState &S, CodePtr OpPC,
   const Floating &Arg1 = S.Stk.pop<Floating>();
   Pointer &Result = S.Stk.peek<Pointer>();
 
-  Result.elem<Floating>(0) = Arg1;
-  Result.elem<Floating>(1) = Arg2;
+  Result.elemRef<Floating>(0) = Arg1;
+  Result.elemRef<Floating>(1) = Arg2;
   Result.initializeAllElements();
 
   return true;
@@ -1863,13 +1863,13 @@ static bool interp__builtin_elementwise_abs(InterpState &S, CodePtr OpPC,
   for (unsigned I = 0; I != NumElems; ++I) {
     if (ElemType->isIntegerType()) {
       INT_TYPE_SWITCH_NO_BOOL(ElemT, {
-        Dst.elem<T>(I) = T::from(static_cast<T>(
+        Dst.elemRef<T>(I) = T::from(static_cast<T>(
             APSInt(Arg.elem<T>(I).toAPSInt().abs(),
                    ElemType->isUnsignedIntegerOrEnumerationType())));
       });
     } else {
       Floating Val = Arg.elem<Floating>(I);
-      Dst.elem<Floating>(I) = abs(S, Val);
+      Dst.elemRef<Floating>(I) = abs(S, Val);
     }
   }
   Dst.initializeAllElements();
@@ -2491,7 +2491,7 @@ static bool interp__builtin_elementwise_int_unaryop(
     INT_TYPE_SWITCH_NO_BOOL(ElemT, {
       APSInt Src = Arg.elem<T>(I).toAPSInt();
       APInt Result = Fn(Src);
-      Dst.elem<T>(I) = static_cast<T>(APSInt(std::move(Result), DestUnsigned));
+      Dst.elemRef<T>(I) = static_cast<T>(APSInt(std::move(Result), DestUnsigned));
     });
   }
   Dst.initializeAllElements();
@@ -2532,7 +2532,7 @@ static bool interp__builtin_elementwise_fp_binop(
   for (unsigned ElemIdx = 0; ElemIdx != NumElems; ++ElemIdx) {
     using T = PrimConv<PT_Float>::T;
     if (IsScalar && ElemIdx > 0) {
-      Dst.elem<T>(ElemIdx) = APtr.elem<T>(ElemIdx);
+      Dst.elemRef<T>(ElemIdx) = APtr.elem<T>(ElemIdx);
       continue;
     }
     APFloat ElemA = APtr.elem<T>(ElemIdx).getAPFloat();
@@ -2540,7 +2540,7 @@ static bool interp__builtin_elementwise_fp_binop(
     std::optional<APFloat> Result = Fn(ElemA, ElemB, RoundingMode);
     if (!Result)
       return false;
-    Dst.elem<T>(ElemIdx) = static_cast<T>(*Result);
+    Dst.elemRef<T>(ElemIdx) = static_cast<T>(*Result);
   }
 
   Dst.initializeAllElements();
@@ -2576,13 +2576,13 @@ static bool interp__builtin_scalar_fp_round_mask_binop(
     std::optional<APFloat> Result = Fn(ElemA, ElemB, RoundingMode);
     if (!Result)
       return false;
-    Dst.elem<T>(0) = static_cast<T>(*Result);
+    Dst.elemRef<T>(0) = static_cast<T>(*Result);
   } else {
-    Dst.elem<T>(0) = SrcPtr.elem<T>(0);
+    Dst.elemRef<T>(0) = SrcPtr.elem<T>(0);
   }
 
   for (unsigned I = 1; I < NumElems; ++I)
-    Dst.elem<T>(I) = APtr.elem<T>(I);
+    Dst.elemRef<T>(I) = APtr.elem<T>(I);
 
   Dst.initializeAllElements();
 
@@ -2626,7 +2626,7 @@ static bool interp__builtin_elementwise_int_binop(
 
     for (unsigned I = 0; I != NumElems; ++I) {
       INT_TYPE_SWITCH_NO_BOOL(ElemT, {
-        Dst.elem<T>(I) = static_cast<T>(
+        Dst.elemRef<T>(I) = static_cast<T>(
             APSInt(Fn(LHS.elem<T>(I).toAPSInt(), RHS), DestUnsigned));
       });
     }
@@ -2650,7 +2650,7 @@ static bool interp__builtin_elementwise_int_binop(
     INT_TYPE_SWITCH_NO_BOOL(ElemT, {
       APSInt Elem1 = LHS.elem<T>(I).toAPSInt();
       APSInt Elem2 = RHS.elem<T>(I).toAPSInt();
-      Dst.elem<T>(I) = static_cast<T>(APSInt(Fn(Elem1, Elem2), DestUnsigned));
+      Dst.elemRef<T>(I) = static_cast<T>(APSInt(Fn(Elem1, Elem2), DestUnsigned));
     });
   }
   Dst.initializeAllElements();
@@ -2773,7 +2773,7 @@ static bool interp__builtin_elementwise_maxmin(InterpState &S, CodePtr OpPC,
     }
 
     INT_TYPE_SWITCH_NO_BOOL(ElemT,
-                            { Dst.elem<T>(I) = static_cast<T>(Result); });
+                            { Dst.elemRef<T>(I) = static_cast<T>(Result); });
   }
   Dst.initializeAllElements();
 
@@ -2810,7 +2810,7 @@ static bool interp__builtin_ia32_pmul(
     });
 
     INT_TYPE_SWITCH_NO_BOOL(DestElemT,
-                            { Dst.elem<T>(DstElem) = static_cast<T>(Result); });
+                            { Dst.elemRef<T>(DstElem) = static_cast<T>(Result); });
     ++DstElem;
   }
 
@@ -2848,7 +2848,7 @@ static bool interp__builtin_ia32_psadbw(InterpState &S, CodePtr OpPC,
     }
 
     INT_TYPE_SWITCH_NO_BOOL(DestElemT, {
-      Dst.elem<T>(DstElem) = static_cast<T>(APSInt(Sum, DestUnsigned));
+      Dst.elemRef<T>(DstElem) = static_cast<T>(APSInt(Sum, DestUnsigned));
     });
     ++DstElem;
   }
@@ -2917,7 +2917,7 @@ static bool interp__builtin_ia32_dbpsadbw(InterpState &S, CodePtr OpPC,
     }
     for (unsigned R = 0; R < 4; ++R) {
       INT_TYPE_SWITCH_NO_BOOL(DestElemT, {
-        Dst.elem<T>(I + R) =
+        Dst.elemRef<T>(I + R) =
             static_cast<T>(APSInt(APInt(16, Sad[R]), DestUnsigned));
       });
     }
@@ -2967,7 +2967,7 @@ static bool interp__builtin_ia32_mpsadbw(InterpState &S, CodePtr OpPC,
         Sad += (A > B) ? (A - B) : (B - A);
       }
       INT_TYPE_SWITCH_NO_BOOL(DestElemT, {
-        Dst.elem<T>(Lane * 8 + J) =
+        Dst.elemRef<T>(Lane * 8 + J) =
             static_cast<T>(APSInt(APInt(16, Sad), DestUnsigned));
       });
     }
@@ -3000,7 +3000,7 @@ static bool interp_builtin_horizontal_int_binop(
         APSInt Elem1 = LHS.elem<T>(LaneStart + I).toAPSInt();
         APSInt Elem2 = LHS.elem<T>(LaneStart + I + 1).toAPSInt();
         APSInt ResL = APSInt(Fn(Elem1, Elem2), DestUnsigned);
-        Dst.elem<T>(DestIndex++) = static_cast<T>(ResL);
+        Dst.elemRef<T>(DestIndex++) = static_cast<T>(ResL);
       });
     }
 
@@ -3009,7 +3009,7 @@ static bool interp_builtin_horizontal_int_binop(
         APSInt Elem1 = RHS.elem<T>(LaneStart + I).toAPSInt();
         APSInt Elem2 = RHS.elem<T>(LaneStart + I + 1).toAPSInt();
         APSInt ResR = APSInt(Fn(Elem1, Elem2), DestUnsigned);
-        Dst.elem<T>(DestIndex++) = static_cast<T>(ResR);
+        Dst.elemRef<T>(DestIndex++) = static_cast<T>(ResR);
       });
     }
   }
@@ -3040,12 +3040,12 @@ static bool interp_builtin_horizontal_fp_binop(
     for (unsigned E = 0; E != HalfElemsPerLane; ++E) {
       APFloat Elem1 = LHS.elem<T>(L + (2 * E) + 0).getAPFloat();
       APFloat Elem2 = LHS.elem<T>(L + (2 * E) + 1).getAPFloat();
-      Dst.elem<T>(L + E) = static_cast<T>(Fn(Elem1, Elem2, RM));
+      Dst.elemRef<T>(L + E) = static_cast<T>(Fn(Elem1, Elem2, RM));
     }
     for (unsigned E = 0; E != HalfElemsPerLane; ++E) {
       APFloat Elem1 = RHS.elem<T>(L + (2 * E) + 0).getAPFloat();
       APFloat Elem2 = RHS.elem<T>(L + (2 * E) + 1).getAPFloat();
-      Dst.elem<T>(L + E + HalfElemsPerLane) =
+      Dst.elemRef<T>(L + E + HalfElemsPerLane) =
           static_cast<T>(Fn(Elem1, Elem2, RM));
     }
   }
@@ -3076,7 +3076,7 @@ static bool interp__builtin_ia32_addsub(InterpState &S, CodePtr OpPC,
       // Odd indices: add
       LElem.add(RElem, RM);
     }
-    Dst.elem<T>(I) = static_cast<T>(LElem);
+    Dst.elemRef<T>(I) = static_cast<T>(LElem);
   }
   Dst.initializeAllElements();
   return true;
@@ -3134,8 +3134,8 @@ static bool interp__builtin_ia32_pclmulqdq(InterpState &S, CodePtr OpPC,
     APSInt ResultHigh(Result.extractBits(64, 64), DestUnsigned);
 
     INT_TYPE_SWITCH_NO_BOOL(DestElemT, {
-      Dst.elem<T>(Lane + 0) = static_cast<T>(ResultLow);
-      Dst.elem<T>(Lane + 1) = static_cast<T>(ResultHigh);
+      Dst.elemRef<T>(Lane + 0) = static_cast<T>(ResultLow);
+      Dst.elemRef<T>(Lane + 1) = static_cast<T>(ResultHigh);
     });
   }
 
@@ -3198,7 +3198,7 @@ static bool interp__builtin_elementwise_triop_fp(
     APFloat Y = VY.elem<T>(I).getAPFloat();
     APFloat Z = VZ.elem<T>(I).getAPFloat();
     APFloat F = Fn(X, Y, Z, RM);
-    Dst.elem<Floating>(I) = Floating(F);
+    Dst.elemRef<Floating>(I) = Floating(F);
   }
   Dst.initializeAllElements();
   return true;
@@ -3223,7 +3223,7 @@ static bool interp__builtin_ia32_select(InterpState &S, CodePtr OpPC,
   for (unsigned I = 0; I != NumElems; ++I) {
     if (ElemT == PT_Float) {
       assert(DstElemT == PT_Float);
-      Dst.elem<Floating>(I) =
+      Dst.elemRef<Floating>(I) =
           Mask[I] ? LHS.elem<Floating>(I) : RHS.elem<Floating>(I);
     } else {
       APSInt Elem;
@@ -3231,7 +3231,7 @@ static bool interp__builtin_ia32_select(InterpState &S, CodePtr OpPC,
         Elem = Mask[I] ? LHS.elem<T>(I).toAPSInt() : RHS.elem<T>(I).toAPSInt();
       });
       INT_TYPE_SWITCH_NO_BOOL(DstElemT,
-                              { Dst.elem<T>(I) = static_cast<T>(Elem); });
+                              { Dst.elemRef<T>(I) = static_cast<T>(Elem); });
     }
   }
   Dst.initializeAllElements();
@@ -3257,9 +3257,9 @@ static bool interp__builtin_ia32_select_scalar(InterpState &S,
   bool TakeA0 = U.getZExtValue() & 1ULL;
 
   for (unsigned I = TakeA0; I != N; ++I)
-    Dst.elem<Floating>(I) = W.elem<Floating>(I);
+    Dst.elemRef<Floating>(I) = W.elem<Floating>(I);
   if (TakeA0)
-    Dst.elem<Floating>(0) = A.elem<Floating>(0);
+    Dst.elemRef<Floating>(0) = A.elem<Floating>(0);
 
   Dst.initializeAllElements();
   return true;
@@ -3373,7 +3373,7 @@ static bool interp__builtin_elementwise_triop(
     const Pointer &Dst = S.Stk.peek<Pointer>();
     for (unsigned I = 0; I != NumElems; ++I) {
       INT_TYPE_SWITCH_NO_BOOL(ElemT, {
-        Dst.elem<T>(I) = static_cast<T>(APSInt(
+        Dst.elemRef<T>(I) = static_cast<T>(APSInt(
             Fn(Op0.elem<T>(I).toAPSInt(), Op1.elem<T>(I).toAPSInt(), Op2),
             DestUnsigned));
       });
@@ -3397,7 +3397,7 @@ static bool interp__builtin_elementwise_triop(
     });
     APSInt Result = APSInt(Fn(Val0, Val1, Val2), Val0.isUnsigned());
     INT_TYPE_SWITCH_NO_BOOL(ElemT,
-                            { Dst.elem<T>(I) = static_cast<T>(Result); });
+                            { Dst.elemRef<T>(I) = static_cast<T>(Result); });
   }
   Dst.initializeAllElements();
 
@@ -3433,7 +3433,7 @@ static bool interp__builtin_ia32_extract_vector(InterpState &S, CodePtr OpPC,
 
   TYPE_SWITCH(ElemT, {
     for (unsigned I = 0; I != DstElems; ++I) {
-      Dst.elem<T>(I) = Src.elem<T>(ExtractPos + I);
+      Dst.elemRef<T>(I) = Src.elem<T>(ExtractPos + I);
     }
   });
 
@@ -3476,9 +3476,9 @@ static bool interp__builtin_ia32_extract_vector_masked(InterpState &S,
   TYPE_SWITCH(ElemT, {
     for (unsigned I = 0; I != DstElems; ++I) {
       if (MaskAPS[I])
-        Dst.elem<T>(I) = Src.elem<T>(Base + I);
+        Dst.elemRef<T>(I) = Src.elem<T>(Base + I);
       else
-        Dst.elem<T>(I) = Merge.elem<T>(I);
+        Dst.elemRef<T>(I) = Merge.elem<T>(I);
     }
   });
 
@@ -3520,9 +3520,9 @@ static bool interp__builtin_ia32_insert_subvector(InterpState &S, CodePtr OpPC,
 
   TYPE_SWITCH(ElemT, {
     for (unsigned I = 0; I != BaseElements; ++I)
-      Dst.elem<T>(I) = BaseVec.elem<T>(I);
+      Dst.elemRef<T>(I) = BaseVec.elem<T>(I);
     for (unsigned I = 0; I != SubElements; ++I)
-      Dst.elem<T>(InsertPos + I) = SubVec.elem<T>(I);
+      Dst.elemRef<T>(InsertPos + I) = SubVec.elem<T>(I);
   });
 
   Dst.initializeAllElements();
@@ -3558,10 +3558,10 @@ static bool interp__builtin_ia32_phminposuw(InterpState &S, CodePtr OpPC,
       }
     }
 
-    Dest.elem<T>(0) = static_cast<T>(MinVal);
-    Dest.elem<T>(1) = static_cast<T>(MinIndex);
+    Dest.elemRef<T>(0) = static_cast<T>(MinVal);
+    Dest.elemRef<T>(1) = static_cast<T>(MinIndex);
     for (unsigned I = 2; I != SourceLen; ++I) {
-      Dest.elem<T>(I) = static_cast<T>(APSInt(ElemBitWidth, DestUnsigned));
+      Dest.elemRef<T>(I) = static_cast<T>(APSInt(ElemBitWidth, DestUnsigned));
     }
   });
   Dest.initializeAllElements();
@@ -3605,11 +3605,11 @@ static bool interp__builtin_ia32_pternlog(InterpState &S, CodePtr OpPC,
           unsigned Idx = (ABit << 2) | (BBit << 1) | (CBit);
           RLane.setBitVal(Bit, Imm[Idx]);
         }
-        Dst.elem<T>(I) = static_cast<T>(APSInt(RLane, DstUnsigned));
+        Dst.elemRef<T>(I) = static_cast<T>(APSInt(RLane, DstUnsigned));
       } else if (MaskZ) { // If zero masked, zero the lane.
-        Dst.elem<T>(I) = static_cast<T>(APSInt(RLane, DstUnsigned));
+        Dst.elemRef<T>(I) = static_cast<T>(APSInt(RLane, DstUnsigned));
       } else { // Just masked, put in A lane.
-        Dst.elem<T>(I) = static_cast<T>(APSInt(ALane, DstUnsigned));
+        Dst.elemRef<T>(I) = static_cast<T>(APSInt(ALane, DstUnsigned));
       }
     }
   });
@@ -3670,8 +3670,8 @@ static bool interp__builtin_ia32_vec_set(InterpState &S, CodePtr OpPC,
   PrimType ElemT = Base.getFieldDesc()->getPrimType();
   INT_TYPE_SWITCH_NO_BOOL(ElemT, {
     for (unsigned I = 0; I != NumElems; ++I)
-      Dst.elem<T>(I) = Base.elem<T>(I);
-    Dst.elem<T>(Index) = static_cast<T>(ValAPS);
+      Dst.elemRef<T>(I) = Base.elem<T>(I);
+    Dst.elemRef<T>(Index) = static_cast<T>(ValAPS);
   });
 
   Dst.initializeAllElements();
@@ -3756,7 +3756,7 @@ static bool interp__builtin_ia32_vpconflict(InterpState &S, CodePtr OpPC,
         APSInt ElemJ = Src.elem<T>(J).toAPSInt();
         ConflictMask.setBitVal(J, ElemI == ElemJ);
       }
-      Dst.elem<T>(I) = static_cast<T>(APSInt(ConflictMask, DestUnsigned));
+      Dst.elemRef<T>(I) = static_cast<T>(APSInt(ConflictMask, DestUnsigned));
     });
   }
   Dst.initializeAllElements();
@@ -3802,7 +3802,7 @@ static bool interp__builtin_ia32_cvt_mask2vec(InterpState &S, CodePtr OpPC,
     bool BitSet = Mask[I];
 
     INT_TYPE_SWITCH_NO_BOOL(
-        ElemT, { Vec.elem<T>(I) = BitSet ? T::from(-1) : T::from(0); });
+        ElemT, { Vec.elemRef<T>(I) = BitSet ? T::from(-1) : T::from(0); });
   }
 
   Vec.initializeAllElements();
@@ -3842,7 +3842,7 @@ static bool interp__builtin_ia32_cvtsd2ss(InterpState &S, CodePtr OpPC,
 
   // Copy all elements except lane 0 (overwritten below) from A to Dst.
   for (unsigned I = 1; I != NumElems; ++I)
-    Dst.elem<Floating>(I) = A.elem<Floating>(I);
+    Dst.elemRef<Floating>(I) = A.elem<Floating>(I);
 
   // Convert element 0 from double to float, or use Src if masked off.
   if (!HasRoundingMask || (MaskInt.getZExtValue() & 0x1)) {
@@ -3854,9 +3854,9 @@ static bool interp__builtin_ia32_cvtsd2ss(InterpState &S, CodePtr OpPC,
     APFloat SrcVal = B.elem<Floating>(0).getAPFloat();
     if (!convertDoubleToFloatStrict(SrcVal, Conv, S, Call))
       return false;
-    Dst.elem<Floating>(0) = Conv;
+    Dst.elemRef<Floating>(0) = Conv;
   } else {
-    Dst.elem<Floating>(0) = Src.elem<Floating>(0);
+    Dst.elemRef<Floating>(0) = Src.elem<Floating>(0);
   }
 
   Dst.initializeAllElements();
@@ -3905,9 +3905,9 @@ static bool interp__builtin_ia32_cvtpd2ps(InterpState &S, CodePtr OpPC,
   // Initialize destination with passthrough or zeros.
   for (unsigned I = 0; I != RetElems; ++I)
     if (IsMasked)
-      Dst.elem<Floating>(I) = PassThrough.elem<Floating>(I);
+      Dst.elemRef<Floating>(I) = PassThrough.elem<Floating>(I);
     else
-      Dst.elem<Floating>(I) = Floating(APFloat(0.0f));
+      Dst.elemRef<Floating>(I) = Floating(APFloat(0.0f));
 
   assert(S.getASTContext().FloatTy == RetVTy->getElementType() &&
          "cvtpd2ps requires float element type in return vector");
@@ -3924,7 +3924,7 @@ static bool interp__builtin_ia32_cvtpd2ps(InterpState &S, CodePtr OpPC,
         S.getASTContext().getFloatTypeSemantics(RetVTy->getElementType()));
     if (!convertDoubleToFloatStrict(SrcVal, Conv, S, Call))
       return false;
-    Dst.elem<Floating>(I) = Conv;
+    Dst.elemRef<Floating>(I) = Conv;
   }
 
   Dst.initializeAllElements();
@@ -4005,14 +4005,14 @@ static bool interp__builtin_ia32_shuffle_generic(
     if (SrcIdx < 0) {
       // Zero out this element
       if (ElemT == PT_Float) {
-        Dst.elem<Floating>(DstIdx) = Floating(
+        Dst.elemRef<Floating>(DstIdx) = Floating(
             S.getASTContext().getFloatTypeSemantics(VecT->getElementType()));
       } else {
-        INT_TYPE_SWITCH_NO_BOOL(ElemT, { Dst.elem<T>(DstIdx) = T::from(0); });
+        INT_TYPE_SWITCH_NO_BOOL(ElemT, { Dst.elemRef<T>(DstIdx) = T::from(0); });
       }
     } else {
       const Pointer &Src = (SrcVecIdx == 0) ? A : B;
-      TYPE_SWITCH(ElemT, { Dst.elem<T>(DstIdx) = Src.elem<T>(SrcIdx); });
+      TYPE_SWITCH(ElemT, { Dst.elemRef<T>(DstIdx) = Src.elem<T>(SrcIdx); });
     }
   }
   Dst.initializeAllElements();
@@ -4082,11 +4082,11 @@ static bool interp__builtin_ia32_shift_with_count(
     }
     if (IsDestUnsigned) {
       INT_TYPE_SWITCH(SourceElemT, {
-        Dst.elem<T>(EltIdx) = T::from(Result.getZExtValue());
+        Dst.elemRef<T>(EltIdx) = T::from(Result.getZExtValue());
       });
     } else {
       INT_TYPE_SWITCH(SourceElemT, {
-        Dst.elem<T>(EltIdx) = T::from(Result.getSExtValue());
+        Dst.elemRef<T>(EltIdx) = T::from(Result.getSExtValue());
       });
     }
   }
@@ -4233,7 +4233,7 @@ static bool interp__builtin_ia32_vcvtps2ph(InterpState &S, CodePtr OpPC,
       // Convert the destination value's bit pattern to an unsigned integer,
       // then reconstruct the element using the target type's 'from' method.
       uint64_t RawBits = DstVal.bitcastToAPInt().getZExtValue();
-      Dst.elem<T>(I) = T::from(RawBits);
+      Dst.elemRef<T>(I) = T::from(RawBits);
     });
   }
 
@@ -4241,7 +4241,7 @@ static bool interp__builtin_ia32_vcvtps2ph(InterpState &S, CodePtr OpPC,
   // (e.g., vcvtps2ph converting 4 floats to 8 shorts).
   if (DstNumElems > SrcNumElems) {
     for (unsigned I = SrcNumElems; I != DstNumElems; ++I) {
-      INT_TYPE_SWITCH_NO_BOOL(DstElemT, { Dst.elem<T>(I) = T::from(0); });
+      INT_TYPE_SWITCH_NO_BOOL(DstElemT, { Dst.elemRef<T>(I) = T::from(0); });
     }
   }
 
@@ -4294,7 +4294,7 @@ static bool interp__builtin_ia32_multishiftqb(InterpState &S, CodePtr OpPC,
         Byte.setBitVal(BitIdx, BQWord[(Ctrl + BitIdx) & 0x3F]);
       }
       INT_TYPE_SWITCH(ElemT,
-                      { Dst.elem<T>(Idx) = T::from(Byte.getZExtValue()); });
+                      { Dst.elemRef<T>(Idx) = T::from(Byte.getZExtValue()); });
     }
   }
 
@@ -4356,7 +4356,7 @@ static bool interp__builtin_ia32_gfni_affine(InterpState &S, CodePtr OpPC,
       uint8_t XByte =
           XQWord.lshr(ByteIdx * NumBitsInByte).getLoBits(8).getZExtValue();
       INT_TYPE_SWITCH(AElemT, {
-        Dst.elem<T>(Idx) = T::from(GFNIAffine(XByte, AQWord, Imm, Inverse));
+        Dst.elemRef<T>(Idx) = T::from(GFNIAffine(XByte, AQWord, Imm, Inverse));
       });
     }
   }
@@ -4391,7 +4391,7 @@ static bool interp__builtin_ia32_gfni_mul(InterpState &S, CodePtr OpPC,
     INT_TYPE_SWITCH(AElemT, {
       AByte = static_cast<uint8_t>(A.elem<T>(ByteIdx));
       BByte = static_cast<uint8_t>(B.elem<T>(ByteIdx));
-      Dst.elem<T>(ByteIdx) = T::from(GFNIMul(AByte, BByte));
+      Dst.elemRef<T>(ByteIdx) = T::from(GFNIMul(AByte, BByte));
     });
   }
 
@@ -4453,7 +4453,7 @@ static bool interp__builtin_ia32_vpdp(InterpState &S, CodePtr OpPC,
     else
       Acc = APSInt(Acc.trunc(32), false);
     INT_TYPE_SWITCH_NO_BOOL(DstElemT,
-                            { Dst.elem<T>(I) = static_cast<T>(Acc); });
+                            { Dst.elemRef<T>(I) = static_cast<T>(Acc); });
   }
   Dst.initializeAllElements();
   return true;
@@ -4533,7 +4533,7 @@ static bool interp__builtin_ia32_bmac(InterpState &S, CodePtr OpPC,
 
   INT_TYPE_SWITCH_NO_BOOL(ElemT, {
     for (unsigned I = 0; I != NumElems; ++I)
-      Dst.elem<T>(I) = static_cast<T>(APSInt(APInt(16, Acc[I]), DstUnsigned));
+      Dst.elemRef<T>(I) = static_cast<T>(APSInt(APInt(16, Acc[I]), DstUnsigned));
   });
   Dst.initializeAllElements();
   return true;
@@ -4588,13 +4588,13 @@ static bool interp_builtin_ia32_cvt_vector_to_int(InterpState &S, CodePtr OpPC,
     if (!IsExact)
       return false;
     INT_TYPE_SWITCH_NO_BOOL(
-        ElemT, { Dst.elem<T>(I) = T::from(IntResult.getZExtValue()); });
+        ElemT, { Dst.elemRef<T>(I) = T::from(IntResult.getZExtValue()); });
   }
 
   // Zero out remaining elements if the destination has more elements
   // (e.g., cvtpd2dq converting 2 doubles(_m128d) to 2 ints stored in _m128i).
   for (unsigned I = NumSrcElems; I != NumDstElems; ++I)
-    INT_TYPE_SWITCH_NO_BOOL(ElemT, { Dst.elem<T>(I) = T::from(0); });
+    INT_TYPE_SWITCH_NO_BOOL(ElemT, { Dst.elemRef<T>(I) = T::from(0); });
 
   Dst.initializeAllElements();
   return true;

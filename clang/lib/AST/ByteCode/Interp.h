@@ -540,11 +540,11 @@ inline bool Mulc(InterpState &S) {
     // Copy into the result.
     Floating RA = S.allocFloat(A.getSemantics());
     RA.copy(ResR);
-    Result.elem<Floating>(0) = RA; // Floating(ResR);
+    Result.elemRef<Floating>(0) = RA; // Floating(ResR);
 
     Floating RI = S.allocFloat(A.getSemantics());
     RI.copy(ResI);
-    Result.elem<Floating>(1) = RI; // Floating(ResI);
+    Result.elemRef<Floating>(1) = RI; // Floating(ResI);
     Result.initializeAllElements();
   } else {
     // Integer element type.
@@ -573,8 +573,8 @@ inline bool Mulc(InterpState &S) {
       return false;
 
     if constexpr (needsAlloc<T>())
-      Result.elem<T>(0) = S.allocAP<T>(Bits);
-    if (T::sub(A, B, Bits, &Result.elem<T>(0)))
+      Result.elemRef<T>(0) = S.allocAP<T>(Bits);
+    if (T::sub(A, B, Bits, &Result.elemRef<T>(0)))
       return false;
 
     // imag(Result) = (real(LHS) * imag(RHS)) + (imag(LHS) * real(RHS))
@@ -584,8 +584,8 @@ inline bool Mulc(InterpState &S) {
       return false;
 
     if constexpr (needsAlloc<T>())
-      Result.elem<T>(1) = S.allocAP<T>(Bits);
-    if (T::add(A, B, Bits, &Result.elem<T>(1)))
+      Result.elemRef<T>(1) = S.allocAP<T>(Bits);
+    if (T::add(A, B, Bits, &Result.elemRef<T>(1)))
       return false;
     Result.initialize();
     Result.initializeAllElements();
@@ -613,11 +613,11 @@ inline bool Divc(InterpState &S, CodePtr OpPC) {
     // Copy into the result.
     Floating RA = S.allocFloat(A.getSemantics());
     RA.copy(ResR);
-    Result.elem<Floating>(0) = RA; // Floating(ResR);
+    Result.elemRef<Floating>(0) = RA; // Floating(ResR);
 
     Floating RI = S.allocFloat(A.getSemantics());
     RI.copy(ResI);
-    Result.elem<Floating>(1) = RI; // Floating(ResI);
+    Result.elemRef<Floating>(1) = RI; // Floating(ResI);
 
     Result.initializeAllElements();
   } else {
@@ -658,8 +658,8 @@ inline bool Divc(InterpState &S, CodePtr OpPC) {
     }
 
     // real(Result) = ((real(LHS) * real(RHS)) + (imag(LHS) * imag(RHS))) / Den
-    T &ResultR = Result.elem<T>(0);
-    T &ResultI = Result.elem<T>(1);
+    T &ResultR = Result.elemRef<T>(0);
+    T &ResultI = Result.elemRef<T>(1);
     if constexpr (needsAlloc<T>()) {
       ResultR = S.allocAP<T>(Bits);
       ResultI = S.allocAP<T>(Bits);
@@ -2492,7 +2492,7 @@ bool InitElem(InterpState &S, CodePtr OpPC, uint32_t Idx) {
     return false;
   }
   Ptr.initializeElement(Idx);
-  new (&Ptr.elem<T>(Idx)) T(Value);
+  new (&Ptr.elemRef<T>(Idx)) T(Value);
   return true;
 }
 
@@ -2529,7 +2529,7 @@ bool InitElemPop(InterpState &S, CodePtr OpPC, uint32_t Idx) {
     return false;
   }
   Ptr.initializeElement(Idx);
-  new (&Ptr.elem<T>(Idx)) T(Value);
+  new (&Ptr.elemRef<T>(Idx)) T(Value);
   return true;
 }
 
@@ -3639,7 +3639,7 @@ inline bool FillArray(InterpState &S, CodePtr OpPC, uint32_t StartIndex,
     return false;
 
   for (uint32_t I = StartIndex, E = StartIndex + Count; I != E; ++I) {
-    Ptr.elem<T>(I) = Value;
+    Ptr.elemRef<T>(I) = Value;
     Ptr.initializeElement(I);
   }
 
@@ -3672,7 +3672,7 @@ inline bool CopyArray(InterpState &S, CodePtr OpPC, uint32_t SrcIndex,
     if (!CheckLoad(S, OpPC, SP))
       return false;
 
-    DestPtr.elem<T>(DestIndex + I) = SrcPtr.elem<T>(SrcIndex + I);
+    DestPtr.elemRef<T>(DestIndex + I) = SrcPtr.elem<T>(SrcIndex + I);
     DestPtr.initializeElement(DestIndex + I);
   }
   return true;
